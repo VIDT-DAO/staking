@@ -1,4 +1,5 @@
 # VIDT staking
+![Mock screen](https://user-images.githubusercontent.com/100821/105279406-c05e3e80-5ba7-11eb-9c97-d4fff8c6a8ef.jpeg)
 
 # Quickstart
 
@@ -68,78 +69,92 @@ npm run migrate -- --network mainnet
 npm run verify -- --network mainnet
 ```
 
-The account that is used to create the Farm contract should have a sufficient amount of (LTO) ERC20 to fund the
+The account that is used to create the Staking contract should have a sufficient amount of (LTO) ERC20 to fund the
 contract. Alternatively; to manually fund, remove the 'fund' property from the configuration.
 
 # How it works
 
-The `Farm` contract will distribute ERC20 tokens to participants relative to the number of LP tokens deposited to the
-contract. These ERC20 tokens aren't minted. Instead, the contract needs to be funded.
+The `Staking` contract will distribute ERC20 tokens to participants. This is a fixed amount relative to the number of
+tokens deposited to the contract. These ERC20 tokens aren't minted. Instead, the contract needs to be funded.
+
+The contract can be configured to accept multiple tokens as deposit.
 
 ## Creation
 
-The address of the ERC20 token, the reward per block, and the starting block are specified in the constructor of the
-`Farm` contract.
+The following settings are specified in the constructor of the `Staking` contract
+
+* the address of the ERC20 token
+* the starting block
+* the soft lock period (in blocks)
 
 ## Fund
 
 The contract needs to be funded before the start block. 
 
-To fund the contract, the `Farm` must be allowed to withdraw the amount of ERC20 using the `approve` method of the ERC20
-contract.
+To fund the contract, the `Staking` must be allowed to withdraw the amount of ERC20 using the `approve` method of the
+ERC20 contract.
 
-Call the `fund` method with the appropriate amount The end block is calculated as
+Call the `fund` method with the appropriate amount, and the desired end block.  It's possible to add funds with the staking contract
+is running and increase the end block.
 
-    endBlock = startBlock + (funds / rewardPerBlock)
+If the end block is reached, the staking contract is closed. It will no longer be possible to add funds. If the contract is
+depleted, it will also be automatically closed (even before the specified end date). This prevents a bank run on the
+contract to withdraw funds.
 
-It's possible to add funds with the farm is running and increase the end block.
- 
-If the end block is reached, the farm is closed and it will no longer be possible to add funds.   
+## Adding accepted ERC20 tokens 
 
-## Adding liquidity pairs
+Tokens are distributes amount users that has deposited specific ERC20 tokens. These tokens must be specified in the
+contract using the `add` method.
 
-Tokens are distributes amount users that has deposited specific LP tokens. These LP tokens are distributed by the
-Uniswap contract for providing liqidity. _Other LP tokens could be used as well._
+It's possible to add accepted tokens at a later time.
 
-Each LP token has a specific contract address which can be found on the [Uniswap exchange](https://info.uniswap.org/).
+### Reward per token deposited
 
-Use the `add` method to add a liquidity pair for which the farm will pay out a reward.
+The `add` method takes a `rewardAmount` and `rewardDivider` parameter. If the amount is `10` and the divider is `1000`,
+the contract will pay out `10 / 1000 = 0.01` for every deposited token.
 
-It's possible to add liquidity pairs at a later time. The reward is shared over all pairs.
+It's possible to change the reward at a later time via the `update` method.
 
-### AllocPoint
+## Capped deposit
 
-The `add` method takes an `allocPoint` parameter. When adding multiple pairs, this decides the portion of the reward
-shared for that LP token.
+It's possible to cap the deposit for a specific token using the `cap` method. This method takes 4 parameters;
+`referenceToken`, `referenceAmount`, `cappedToken`, `cappedAmount`.
 
-**Example:** the farm is configured for 3 pairs with an `allocPoint` of resp 6, 12, 18. The
-total alloc points is 36. 1/6th of the tokens is distributed under participants that deposited the pair with 6
-alloc points: (`6 / 36 = 1/6`). 
+Tokens that are capped, can't be used as reference.
 
-It's possible to change the alloc points at a later time via the `update` method.
+Example; if the reference amount is `10000` of token FOO, and the capped amount is `500000` of token BAR, then users
+can deposit max `5 BAR` per `1 FOO`. 
 
 ## Deposit and withdraw
 
-To participate in farming, users must deposit LP tokens using the `deposit` method.
+To participate in staking, users must deposit tokens using the `deposit` method.
 
-Before using this method, the farm must be allowed to withdraw the LP tokens. This is done via the `approve` method on
-the LP token contract.
+Before using this method, the staking contract must be allowed to transfer the tokens. This is done via the `approve`
+method on the token contract.
 
 The current deposit can be check using the `deposited` method. 
 
-Participants can withdraw their LP tokens at any time using the `withdraw` method.
+Participants can withdraw their deposited tokens at any time using the `withdraw` method. However, withdrawing within
+the soft lock period will slash part of the reward.
 
 ## Reward
 
-Each participant has a pending reward which is hold by the farm. The pending reward can be checked using the `pending`
-method.
+Each participant has a pending reward which is hold by the staking contract. The pending reward can be checked using
+the `pending` method.
 
-Any change to the deposit of the participant (with `deposit` or `withdraw`), will pay out the pending reward. It's
-possible to do a zero withdraw to just receive the pending reward.
+When the deposited tokens are withdrawn, the contract will also pay out the reward.
+
+### Soft lock
+
+A soft lock period is specified when creating the contract. If a user withdraws during this period, the reward will be 
+slashed.
+
+The penalty is a percentage of the reward. This is 100% at the starting block and 0% when the soft lock ends. The
+penalty is calculated with a linear formula.
 
 # Frontend
 
-The `frontend` folder contains the frontend application that displays the uniswap pairs and allows users to participate.
+The `frontend` folder contains the frontend application that allows users to participate.
 
-_Note that the frontend is specifically styled and configured for V-ID. You need to modify it to use it for a
+_Note that the frontend is specifically styled and configured for VIDT. You need to modify it to use it for a
 different project._  

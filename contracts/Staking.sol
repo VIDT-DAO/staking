@@ -7,17 +7,18 @@ import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-// Farm distributes the ERC20 rewards based on staked LP to each user.
+// Staking distributes the ERC20 rewards based on staked tokens to each user.
 //
+// Cloned from https://github.com/ltonetwork/uniswap-staking
 // Cloned from https://github.com/SashimiProject/sashimiswap/blob/master/contracts/MasterChef.sol
-// Modified by LTO Network to work for non-mintable ERC20.
-contract Farm is Ownable {
+//
+contract Staking is Ownable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
     // Info of each user.
     struct UserInfo {
-        uint256 amount;     // How many LP tokens the user has provided.
+        uint256 amount;     // How many accepted tokens the user has provided.
         uint256 rewardDebt; // Reward debt. See explanation below.
         //
         // We do some fancy math here. Basically, any point in time, the amount of ERC20s
@@ -25,7 +26,7 @@ contract Farm is Ownable {
         //
         //   pending reward = (user.amount * pool.accERC20PerShare) - user.rewardDebt
         //
-        // Whenever a user deposits or withdraws LP tokens to a pool. Here's what happens:
+        // Whenever a user deposits or withdraws accepted tokens to a pool. Here's what happens:
         //   1. The pool's `accERC20PerShare` (and `lastRewardBlock`) gets updated.
         //   2. User receives the pending reward sent to his/her address.
         //   3. User's `amount` gets updated.
@@ -34,7 +35,7 @@ contract Farm is Ownable {
 
     // Info of each pool.
     struct PoolInfo {
-        IERC20 lpToken;             // Address of LP token contract.
+        IERC20 acceptedToken;       // Address of accepted token contract.
         uint256 allocPoint;         // How many allocation points assigned to this pool. ERC20s to distribute per block.
         uint256 lastRewardBlock;    // Last block number that ERC20s distribution occurs.
         uint256 accERC20PerShare;   // Accumulated ERC20s per share, times 1e36.
@@ -49,14 +50,14 @@ contract Farm is Ownable {
 
     // Info of each pool.
     PoolInfo[] public poolInfo;
-    // Info of each user that stakes LP tokens.
+    // Info of each user that stakes accepted tokens.
     mapping (uint256 => mapping (address => UserInfo)) public userInfo;
     // Total allocation points. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint = 0;
 
-    // The block number when farming starts.
+    // The block number when staking starts.
     uint256 public startBlock;
-    // The block number when farming ends.
+    // The block number when staking ends.
     uint256 public endBlock;
 
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
@@ -75,24 +76,24 @@ contract Farm is Ownable {
         return poolInfo.length;
     }
 
-    // Fund the farm, increase the end block
+    // Fund the contract, increase the end block
     function fund(uint256 _amount) public {
-        require(block.number < endBlock, "fund: too late, the farm is closed");
+        require(block.number < endBlock, "fund: too late, the contract is closed");
 
         erc20.safeTransferFrom(address(msg.sender), address(this), _amount);
         endBlock += _amount.div(rewardPerBlock);
     }
 
     // Add a new lp to the pool. Can only be called by the owner.
-    // DO NOT add the same LP token more than once. Rewards will be messed up if you do.
-    function add(uint256 _allocPoint, IERC20 _lpToken, bool _withUpdate) public onlyOwner {
+    // DO NOT add the same accepted token more than once. Rewards will be messed up if you do.
+    function add(uint256 _allocPoint, IERC20 _acceptedToken, bool _withUpdate) public onlyOwner {
         if (_withUpdate) {
             massUpdatePools();
         }
         uint256 lastRewardBlock = block.number > startBlock ? block.number : startBlock;
         totalAllocPoint = totalAllocPoint.add(_allocPoint);
         poolInfo.push(PoolInfo({
-            lpToken: _lpToken,
+            acceptedToken: _acceptedToken,
             allocPoint: _allocPoint,
             lastRewardBlock: lastRewardBlock,
             accERC20PerShare: 0
@@ -119,7 +120,7 @@ contract Farm is Ownable {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
         uint256 accERC20PerShare = pool.accERC20PerShare;
-        uint256 lpSupply = pool.lpToken.balanceOf(address(this));
+        uint256 lpSupply = pool.acceptedToken.balanceOf(address(this));
 
         if (block.number > pool.lastRewardBlock && lpSupply != 0) {
             uint256 lastBlock = block.number < endBlock ? block.number : endBlock;
@@ -131,7 +132,7 @@ contract Farm is Ownable {
         return user.amount.mul(accERC20PerShare).div(1e36).sub(user.rewardDebt);
     }
 
-    // View function for total reward the farm has yet to pay out.
+    // View function for total reward the contract has yet to pay out.
     function totalPending() external view returns (uint256) {
         if (block.number <= startBlock) {
             return 0;
@@ -157,7 +158,7 @@ contract Farm is Ownable {
         if (lastBlock <= pool.lastRewardBlock) {
             return;
         }
-        uint256 lpSupply = pool.lpToken.balanceOf(address(this));
+        uint256 lpSupply = pool.acceptedToken.balanceOf(address(this));
         if (lpSupply == 0) {
             pool.lastRewardBlock = lastBlock;
             return;
@@ -170,7 +171,7 @@ contract Farm is Ownable {
         pool.lastRewardBlock = block.number;
     }
 
-    // Deposit LP tokens to Farm for ERC20 allocation.
+    // Deposit accepted tokens to contract for ERC20 allocation.
     function deposit(uint256 _pid, uint256 _amount) public {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
@@ -179,13 +180,13 @@ contract Farm is Ownable {
             uint256 pendingAmount = user.amount.mul(pool.accERC20PerShare).div(1e36).sub(user.rewardDebt);
             erc20Transfer(msg.sender, pendingAmount);
         }
-        pool.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
+        pool.acceptedToken.safeTransferFrom(address(msg.sender), address(this), _amount);
         user.amount = user.amount.add(_amount);
         user.rewardDebt = user.amount.mul(pool.accERC20PerShare).div(1e36);
         emit Deposit(msg.sender, _pid, _amount);
     }
 
-    // Withdraw LP tokens from Farm.
+    // Withdraw accepted tokens from contract.
     function withdraw(uint256 _pid, uint256 _amount) public {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
@@ -195,7 +196,7 @@ contract Farm is Ownable {
         erc20Transfer(msg.sender, pendingAmount);
         user.amount = user.amount.sub(_amount);
         user.rewardDebt = user.amount.mul(pool.accERC20PerShare).div(1e36);
-        pool.lpToken.safeTransfer(address(msg.sender), _amount);
+        pool.acceptedToken.safeTransfer(address(msg.sender), _amount);
         emit Withdraw(msg.sender, _pid, _amount);
     }
 
@@ -203,7 +204,7 @@ contract Farm is Ownable {
     function emergencyWithdraw(uint256 _pid) public {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
-        pool.lpToken.safeTransfer(address(msg.sender), user.amount);
+        pool.acceptedToken.safeTransfer(address(msg.sender), user.amount);
         emit EmergencyWithdraw(msg.sender, _pid, user.amount);
         user.amount = 0;
         user.rewardDebt = 0;

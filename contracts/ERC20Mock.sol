@@ -15,6 +15,10 @@ contract ERC20Mock is ERC20 {
         _mint(msg.sender, initialBalance);
     }
 
+    function mint(address account, uint256 amount) public {
+        _mint(account, amount);
+    }
+
     function transferInternal(address from, address to, uint256 value) public {
         _transfer(from, to, value);
     }
