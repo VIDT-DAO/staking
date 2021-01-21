@@ -113,7 +113,7 @@ It's possible to add accepted tokens at a later time.
 The `add` method takes a `rewardAmount` and `rewardDivider` parameter. If the amount is `10` and the divider is `1000`,
 the contract will pay out `10 / 1000 = 0.01` for every deposited token.
 
-It's possible to change the reward at a later time via the `update` method.
+It's possible to change the reward at a later time via the `set` method.
 
 ## Capped deposit
 
@@ -151,6 +151,8 @@ slashed.
 
 The penalty is a percentage of the reward. This is 100% at the starting block and 0% when the soft lock ends. The
 penalty is calculated with a linear formula.
+
+The penalty will be burned.
 
 # Frontend
 
