@@ -71,6 +71,21 @@ contract Deposits is Ownable {
         return amount;
     }
 
+    // Calculate the reward a user should receive for a specific token.
+    function calcReward(IERC20 _token, address _user, uint256 _rewardPerToken, uint256 _startBlock, uint256 _endBlock) public view returns (uint256) {
+        DepositInfo[] storage userDeposits = deposits[_user];
+        uint256 length = userDeposits.length;
+        uint256 reward = 0;
+
+        for (uint256 n = 0; n < length; ++n) {
+            if (userDeposits[n].token == _token) {
+                reward += userDeposits[n].amount.mul(_rewardPerToken).mul(_endBlock - _startBlock);
+            }
+        }
+
+        return reward;
+    }
+
     // The maximum amount of capped tokens the user is still allowed to deposit.
     function maxDeposit(IERC20 _token, address _user) public view returns (uint256) {
         capInfo storage info = caps[_token];
