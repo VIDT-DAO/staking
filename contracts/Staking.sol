@@ -7,10 +7,7 @@ import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-// Staking distributes the ERC20 rewards based on staked tokens to each user.
-//
-// Cloned from https://github.com/ltonetwork/uniswap-staking
-// Cloned from https://github.com/SashimiProject/sashimiswap/blob/master/contracts/MasterChef.sol
+// Staking distributes the rewards based on deposited tokens to each user.
 //
 contract Staking is Ownable {
     using SafeMath for uint256;
@@ -21,22 +18,6 @@ contract Staking is Ownable {
         uint256 amount;        // How many pool tokens the user has provided.
         uint256 rewardDebt;    // Reward debt. See explanation below.
         uint256 pendingReward; // Fixed reward hold for the user.
-        //
-        // We do some fancy math here. Basically, any point in time, the amount of ERC20s
-        // entitled to a user but is pending to be distributed is:
-        //
-        //   reward = `pendingReward` + (user.amount * pool.accRewardPerToken) - user.rewardDebt
-        //
-        // Whenever a user deposits tokens to a pool. Here's what happens:
-        //   1. User's `amount` gets updated.
-        //   2. User's `rewardDebt` gets updated.
-        //   3. User's `pendingReward` gets updated.
-        //
-        // Whenever a user withdraws tokens from a pool.
-        //   1. User's `amount` is set to zero.
-        //   2. User's `rewardDebt` gets updated.
-        //   3. User's `pendingReward` is set to zero.
-        //   4. User receives the calculated reward sent to his/her address.
     }
 
     // Info of each pool.
@@ -44,7 +25,7 @@ contract Staking is Ownable {
         IERC20 token;               // Address of token contract.
         uint256 rewardPerToken;     // Number of ERC20 per token, times 1e36
         uint256 lastRewardBlock;    // Last block number that ERC20s distribution occurs.
-        uint256 accRewardPerToken;   // Accumulated ERC20 per token, times 1e36.
+        uint256 accRewardPerToken;  // Accumulated ERC20 per token, times 1e36.
     }
 
     // Address of the reward ERC20 Token contract.
@@ -94,10 +75,16 @@ contract Staking is Ownable {
         funded += _amount;
     }
 
-    // Extend the duration of the contract
-    function extend(uint256 _numberOfBlocks) public onlyOwner {
-        require(block.number < endBlock, "fund: too late, the contract is closed");
-        endBlock += _numberOfBlocks;
+    // View function to see pending reward for a user.
+    function pending(address _user) external view returns (uint256) {
+        uint256 reward = 0;
+        uint256 length = poolInfo.length;
+
+        for (uint256 pid = 0; pid < length; ++pid) {
+            reward += 0;//this.pendingPool(pid, _user);
+        }
+
+        return reward;
     }
 
     // Add a new lp to the pool. Can only be called by the owner.
@@ -108,7 +95,6 @@ contract Staking is Ownable {
         }
 
         uint256 lastRewardBlock = block.number > startBlock ? block.number : startBlock;
-        totalAllocPoint = totalAllocPoint.dd(_allocPoint);
         poolInfo.push(PoolInfo({
             token: _token,
             rewardPerToken: (_rewardAmount * 1e36) / _rewardDivider,
@@ -132,7 +118,7 @@ contract Staking is Ownable {
     }
 
     // View function to see pending ERC20s for a user.
-    function pending(uint256 _pid, address _user) external view returns (uint256) {
+    function pendingPool(uint256 _pid, address _user) external view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
         uint256 accRewardPerToken = pool.accRewardPerToken;
@@ -141,7 +127,7 @@ contract Staking is Ownable {
         if (block.number > pool.lastRewardBlock && supply != 0) {
             uint256 lastBlock = block.number < endBlock ? block.number : endBlock;
             uint256 nrOfBlocks = lastBlock.sub(pool.lastRewardBlock);
-            uint256 erc20Reward = nrOfBlocks.mul(rewardPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
+            uint256 erc20Reward = 0;//nrOfBlocks.mul(rewardPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
             accRewardPerToken = accRewardPerToken.add(erc20Reward.mul(1e36).div(supply));
         }
 
