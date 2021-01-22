@@ -74,6 +74,8 @@ contract. Alternatively; to manually fund, remove the 'fund' property from the c
 
 # How it works
 
+> **TODO: Staking is split into 2 contracts: `Deposit` and `Staking`. This isn't correctly documented yet in the README.**
+
 The `Staking` contract will distribute ERC20 tokens to participants. This is a fixed amount relative to the number of
 tokens deposited to the contract. These ERC20 tokens aren't minted. Instead, the contract needs to be funded.
 
@@ -119,8 +121,6 @@ It's possible to change the reward at a later time via the `set` method.
 
 It's possible to cap the deposit for a specific token using the `cap` method. This method takes 4 parameters;
 `referenceToken`, `referenceAmount`, `cappedToken`, `cappedAmount`.
-
-Tokens that are capped, can't be used as reference.
 
 Example; if the reference amount is `10000` of token FOO, and the capped amount is `500000` of token BAR, then users
 can deposit max `5 BAR` per `1 FOO`. 
