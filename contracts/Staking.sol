@@ -71,6 +71,11 @@ contract Staking is Ownable {
         }));
     }
 
+    // View function to see deposited tokens for a user.
+    function deposited(uint256 _pid, address _user) public view returns (uint256) {
+        return deposits.deposit(poolInfo[_pid].token, _amount);
+    }
+
     // View function to see pending reward for a user.
     function pending(address _user) public view returns (uint256) {
         uint256 reward = 0;

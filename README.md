@@ -74,73 +74,68 @@ contract. Alternatively; to manually fund, remove the 'fund' property from the c
 
 # How it works
 
-> **TODO: Staking is split into 2 contracts: `Deposit` and `Staking`. This isn't correctly documented yet in the README.**
+The `Deposits` contract holds the deposited tokens of the users. The contract can be configured to accept multiple
+tokens as deposit.
 
 The `Staking` contract will distribute ERC20 tokens to participants. This is a fixed amount relative to the number of
-tokens deposited to the contract. These ERC20 tokens aren't minted. Instead, the contract needs to be funded.
-
-The contract can be configured to accept multiple tokens as deposit.
+tokens deposited to the contract.
 
 ## Creation
+
+The `Deposits` contract can be created without arguments.
 
 The following settings are specified in the constructor of the `Staking` contract
 
 * the address of the ERC20 token
 * the starting block
+* the duration (in blocks)
 * the soft lock period (in blocks)
 
 ## Fund
 
-The contract needs to be funded before the start block. 
+The `Staking` contract will transfer the reward from the contract owner to the staking users. The owner must set an
+allowance for the `Staking` contract using the `approve()` method of the ERC20.
 
-To fund the contract, the `Staking` must be allowed to withdraw the amount of ERC20 using the `approve` method of the
-ERC20 contract.
+**Do not transfer tokens to the `Staking` or `Deposits` contract. These tokens will be lost.**
 
-Call the `fund` method with the appropriate amount, and the desired end block.  It's possible to add funds with the staking contract
-is running and increase the end block.
+## Adding token pools
 
-If the end block is reached, the staking contract is closed. It will no longer be possible to add funds. If the contract is
-depleted, it will also be automatically closed (even before the specified end date). This prevents a bank run on the
-contract to withdraw funds.
+Tokens are distributes amount users that has deposited specific ERC20 tokens. These token pools must be specified in the
+contract using the `add` method of the `Staking` contract. Each token pool have a `pid` which is an incremental number
 
-## Adding accepted ERC20 tokens 
-
-Tokens are distributes amount users that has deposited specific ERC20 tokens. These tokens must be specified in the
-contract using the `add` method.
-
-It's possible to add accepted tokens at a later time.
+Token pools must be added before the starting block.
 
 ### Reward per token deposited
 
 The `add` method takes a `rewardAmount` and `rewardDivider` parameter. If the amount is `10` and the divider is `1000`,
 the contract will pay out `10 / 1000 = 0.01` for every deposited token.
 
-It's possible to change the reward at a later time via the `set` method.
-
 ## Capped deposit
 
-It's possible to cap the deposit for a specific token using the `cap` method. This method takes 4 parameters;
-`referenceToken`, `referenceAmount`, `cappedToken`, `cappedAmount`.
+It's possible to cap the deposit for a specific token using the `cap` method on the `Deposits` contract. This method
+takes 4 parameters; `referenceToken`, `referenceAmount`, `cappedToken`, `cappedAmount`.
 
 Example; if the reference amount is `10000` of token FOO, and the capped amount is `500000` of token BAR, then users
 can deposit max `5 BAR` per `1 FOO`. 
 
 ## Deposit and withdraw
 
-To participate in staking, users must deposit tokens using the `deposit` method.
+To participate in staking, users must deposit tokens using the `deposit` method on the `Staking` contract.
 
 Before using this method, the staking contract must be allowed to transfer the tokens. This is done via the `approve`
 method on the token contract.
 
-The current deposit can be check using the `deposited` method. 
+The current deposit can be checked using the `deposited` method. 
 
-Participants can withdraw their deposited tokens at any time using the `withdraw` method. However, withdrawing within
-the soft lock period will slash part of the reward.
+Participants can withdraw their deposited tokens at any time using the `withdraw` method.
 
 ## Reward
 
 Each participant has a pending reward which is hold by the staking contract. The pending reward can be checked using
 the `pending` method.
+
+Calling the `harvest` method will transfer the reward from the contract owner to the user. The `harvest` method differs
+from the `withdraw` method, as it will only transfer the reward and will not withdraw the staked tokens.
 
 When the deposited tokens are withdrawn, the contract will also pay out the reward.
 
