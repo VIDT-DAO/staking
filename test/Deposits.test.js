@@ -1,6 +1,5 @@
 const Deposits = artifacts.require('./Deposits.sol');
 const ERC20 = artifacts.require('./ERC20Mock.sol');
-const { waitUntilBlock } = require('./helpers/tempo')(web3);
 
 contract('Deposits', ([owner, alice, bob, carl]) => {
     before(async () => {
@@ -173,6 +172,33 @@ contract('Deposits', ([owner, alice, bob, carl]) => {
             const reward = await this.deposits.calcReward(this.token1.address, alice, 3, 1000, 2000);
             assert.equal(1000 * 1500 * 3, reward)
         });
+    });
+
+    describe('has a limit of a token', () => {
+        before(async () => {
+            await this.deposits.limit(this.token1.address, 3500);
+            await this.token1.approve(this.deposits.address, 1000, { from: alice });
+        });
+
+        it('won\'t allow alice to add 1000 tokens', async () => {
+            try {
+                await this.deposits.deposit(this.token1.address, 1000, { from: alice });
+            } catch (ex) {
+                assert.equal(ex.receipt.status, '0x0');
+                assert.equal(ex.reason, 'Limit reached');
+                return;
+            }
+            assert.fail('deposit successful');
+        });
+
+        it('will allow alice to add 500 tokens', async () => {
+            await this.deposits.deposit(this.token1.address, 500, { from: alice });
+
+            const balanceToken1 = await this.token1.balanceOf(alice);
+            const depositToken1 = await this.deposits.deposited(this.token1.address, alice);
+            assert.equal(3000, balanceToken1);
+            assert.equal(2000, depositToken1);
+        })
     });
 
     describe('tokens are withdrawn', () => {

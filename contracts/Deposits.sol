@@ -30,6 +30,8 @@ contract Deposits is Ownable {
 
     mapping (IERC20 => capInfo) public caps;
 
+    mapping (IERC20 => uint256) public limits;
+
     // List of deposits of each user.
     mapping (address => DepositInfo[]) public deposits;
     // Total deposit per token.
@@ -47,8 +49,15 @@ contract Deposits is Ownable {
         });
     }
 
+    // Remove the cap of a token.
     function uncap(IERC20 _cappedToken) public onlyOwner {
         delete caps[_cappedToken];
+    }
+
+    // Configure a limit of the total number of a token that the can be deposited (by all users).
+    // Set to 0 to remove the limit.
+    function limit(IERC20 _token, uint256 _limit) public onlyOwner {
+        limits[_token] = _limit;
     }
 
     // View function to see deposited tokens.
@@ -108,6 +117,7 @@ contract Deposits is Ownable {
 
     // Deposit tokens to the contract.
     function deposit(IERC20 _token, uint256 _amount) public {
+        require(limits[_token] == 0 || totals[_token].add(_amount) <= limits[_token], "Limit reached");
         require(_amount <= maxDeposit(_token, msg.sender), "Not allowed to deposit specified amount of capped token");
 
         _token.safeTransferFrom(address(msg.sender), address(this), _amount);

@@ -71,9 +71,12 @@ contract Staking is Ownable {
         }));
     }
 
-    // View function to see deposited tokens for a user.
-    function deposited(uint256 _pid, address _user) public view returns (uint256) {
-        return deposits.deposit(poolInfo[_pid].token, _amount);
+    // View function to see number of deposited tokens and the maximum amount the user is still allowed to deposit.
+    function deposited(uint256 _pid, address _user) external view returns (uint256, uint256) {
+        return (
+            deposits.deposited(poolInfo[_pid].token, _user),
+            deposits.maxDeposit(poolInfo[_pid].token, _user)
+        );
     }
 
     // View function to see pending reward for a user.
@@ -98,7 +101,7 @@ contract Staking is Ownable {
 
     // Deposit tokens to contract for staking rewards.
     function deposit(uint256 _pid, uint256 _amount) public {
-        require(block.number < endBlock, "Sorry, the staking program has ended");
+        require(block.number < endBlock, "The staking program has ended");
 
         deposits.deposit(poolInfo[_pid].token, _amount);
     }
