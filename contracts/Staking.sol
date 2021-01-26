@@ -77,23 +77,13 @@ contract Staking is Ownable {
         }));
     }
 
-    // View function to see deposited tokens for a user.
-   function deposited(IERC20 _token, address _user) public view returns (uint256) {
-        return deposits.deposited(poolInfo[_pid].token, _user);
-   }
-
-    // The maximum amount of capped tokens the user is still allowed to deposit.
-    function maxDeposit(IERC20 _token, address _user) public view returns (uint256) {
-        return deposits.maxDeposit(poolInfo[_pid].token, _user);
-    }
-
     // View function to see pending reward for a user.
     function pending(address _user) public view returns (uint256) {
         uint256 reward = 0;
         uint256 length = poolInfo.length;
 
         for (uint256 pid = 0; pid < length; ++pid) {
-            reward += this.pendingPool(pid, _user);
+            reward = reward.add(this.pendingPool(pid, _user));
         }
 
         return reward;
@@ -101,17 +91,14 @@ contract Staking is Ownable {
 
     // View function to see pending rewards for a user for a specific pool.
     function pendingPool(uint256 _pid, address _user) public view returns (uint256) {
+        if (block.number < startBlock) {
+            return 0;
+        }
+
         PoolInfo storage pool = poolInfo[_pid];
         uint256 lastBlock = block.number < endBlock ? block.number : endBlock;
 
         return deposits.calcReward(pool.token, _user, pool.rewardPerToken, startBlock, lastBlock).div(1e36);
-    }
-
-    // Deposit tokens to contract for staking rewards.
-    function deposit(uint256 _pid, uint256 _amount) public {
-        require(block.number < endBlock, "The staking program has ended");
-
-        deposits.deposit(poolInfo[_pid].token, _amount);
     }
 
     // Withdraw all tokens and rewards.

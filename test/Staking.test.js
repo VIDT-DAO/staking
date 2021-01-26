@@ -104,36 +104,21 @@ contract('Staking', ([owner, alice, bob, carl]) => {
     describe('before the start block', () => {
         before(async () => {
             await Promise.all([
-                this.token1.approve(this.staking.address, 1500, { from: alice }),
-                this.token1.approve(this.staking.address, 500, { from: bob })
+                this.token1.approve(this.deposits.address, 1500, {from: alice}),
+                this.token1.approve(this.deposits.address, 500, {from: bob})
             ]);
 
             await Promise.all([
-                this.staking.deposit(0, 1500, {from: alice}),
-                this.staking.deposit(0, 500, {from: bob})
+                this.deposits.deposit(this.token1.address, 1500, {from: alice}),
+                this.deposits.deposit(this.token1.address, 500, {from: bob})
             ]);
         });
 
-        it('allows participants to join', async () => {
-            const balanceStaking = await this.token1.balanceOf(this.staking.address);
-            assert.equal(2000, balanceStaking);
-
-            const balanceAlice = await this.token1.balanceOf(alice);
-            const depositAlice = await this.staking.deposited(0, alice);
-            assert.equal(3500, balanceAlice);
-            assert.equal(1500, depositAlice);
-
-            const balanceBob = await this.token1.balanceOf(alice);
-            const depositBob = await this.staking.deposited(0, bob);
-            assert.equal(0, balanceBob);
-            assert.equal(500, depositBob);
-        });
-
         it('does not assign any rewards yet', async () => {
-            const pendingAlice = await this.staking.pending(0, alice);
+            const pendingAlice = await this.staking.pending(alice);
             assert.equal(0, pendingAlice);
 
-            const pendingBob = await this.staking.pending(0, bob);
+            const pendingBob = await this.staking.pending(bob);
             assert.equal(0, pendingBob);
         });
     })
@@ -144,10 +129,10 @@ contract('Staking', ([owner, alice, bob, carl]) => {
         });
 
         it('has a pending reward for alice and bob', async () => {
-            const pendingAlice = await this.staking.pending(0, alice);
+            const pendingAlice = await this.staking.pending(alice);
             assert.equal(15, pendingAlice);
 
-            const pendingBob = await this.staking.pending(0, bob);
+            const pendingBob = await this.staking.pending(bob);
             assert.equal(5, pendingBob);
         });
     });
@@ -156,18 +141,18 @@ contract('Staking', ([owner, alice, bob, carl]) => {
         before(async () => {
             await waitUntilBlock(10, this.startBlock + 28);
 
-            await this.token1.approve(this.staking.address, 2000, { from: carl });
-            await this.staking.deposit(0, 2000, {from: carl});
+            await this.token1.approve(this.deposits.address, 2000, {from: carl});
+            await this.deposits.deposit(this.token1.address, 2000, {from: carl});
         });
 
         it('has a pending reward for alice and bob, but not yet for carl', async () => {
-            const pendingAlice = await this.staking.pending(0, alice);
+            const pendingAlice = await this.staking.pending(alice);
             assert.equal(45, pendingAlice);
 
-            const pendingBob = await this.staking.pending(0, bob);
+            const pendingBob = await this.staking.pending(bob);
             assert.equal(15, pendingBob);
 
-            const pendingCarl = await this.staking.pending(0, carl);
+            const pendingCarl = await this.staking.pending(carl);
             assert.equal(0, pendingCarl);
         });
     });
@@ -178,13 +163,13 @@ contract('Staking', ([owner, alice, bob, carl]) => {
         });
 
         it('has a pending reward for alice, bob, and carl', async () => {
-            const pendingAlice = await this.staking.pending(0, alice);
+            const pendingAlice = await this.staking.pending(alice);
             assert.equal(75, pendingAlice);
 
-            const pendingBob = await this.staking.pending(0, bob);
+            const pendingBob = await this.staking.pending(bob);
             assert.equal(25, pendingBob);
 
-            const pendingCarl = await this.staking.pending(0, carl);
+            const pendingCarl = await this.staking.pending(carl);
             assert.equal(40, pendingCarl);
         });
     });
@@ -192,7 +177,7 @@ contract('Staking', ([owner, alice, bob, carl]) => {
     describe('with a participant withdrawing after 70 blocks', () => {
         before(async () => {
             await waitUntilBlock(10, this.startBlock + 69);
-            await this.staking.withdraw(0, 1500, {from: alice});
+            await this.staking.withdraw({from: alice});
         });
 
         it('gives alice her deposit and reward', async () => {
@@ -208,7 +193,7 @@ contract('Staking', ([owner, alice, bob, carl]) => {
             assert.equal(0, deposited);
         });
 
-        it('has the correct value for paidOut', async () => {
+        it('has stored the amount that was paid out', async () => {
             const paidOut = await this.staking.paidOut();
             assert.equal(75, paidOut);
         });
@@ -219,13 +204,13 @@ contract('Staking', ([owner, alice, bob, carl]) => {
         });
 
         it('has a pending reward for bob and carl, but not for alice', async () => {
-            const pendingAlice = await this.staking.pending(0, alice);
+            const pendingAlice = await this.staking.pending(alice);
             assert.equal(0, pendingAlice);
 
-            const pendingBob = await this.staking.pending(0, bob);
+            const pendingBob = await this.staking.pending(bob);
             assert.equal(35, pendingBob);
 
-            const pendingCarl = await this.staking.pending(0, carl);
+            const pendingCarl = await this.staking.pending(carl);
             assert.equal(140, pendingCarl);
         });
     });
@@ -305,13 +290,13 @@ contract('Staking', ([owner, alice, bob, carl]) => {
             });
 
             it('reserved nothing for alice, 2450 for bob, and 1000 for carl', async () => {
-                const pendingAlice = await this.staking.pending(0, alice);
+                const pendingAlice = await this.staking.pending(alice);
                 assert.equal(0, pendingAlice);
 
-                const pendingBob = await this.staking.pending(0, bob);
+                const pendingBob = await this.staking.pending(bob);
                 assert.equal(2450, pendingBob);
 
-                const pendingCarl = await this.staking.pending(0, carl);
+                const pendingCarl = await this.staking.pending(carl);
                 assert.equal(1000, pendingCarl);
             });
         });
@@ -320,7 +305,7 @@ contract('Staking', ([owner, alice, bob, carl]) => {
             before(async () => {
                 await waitUntilBlock(10, this.startBlock + 108);
 
-                await this.boost.approve(this.staking.address, 500, { from: carl });
+                await this.boost.approve(this.staking.address, 500, {from: carl});
                 await this.staking.deposit(1, 500, {from: carl});
             });
 
@@ -358,13 +343,13 @@ contract('Staking', ([owner, alice, bob, carl]) => {
             });
 
             it('reserved 75% for LP (50/50 bob/carl)', async () => {
-                const pendingAlice = await this.staking.pending(0, alice);
+                const pendingAlice = await this.staking.pending(alice);
                 assert.equal(0, pendingAlice);
 
-                const pendingBob = await this.staking.pending(0, bob);
+                const pendingBob = await this.staking.pending(bob);
                 assert.equal(2825, pendingBob);
 
-                const pendingCarl = await this.staking.pending(0, carl);
+                const pendingCarl = await this.staking.pending(carl);
                 assert.equal(1375, pendingCarl);
             });
 
@@ -384,7 +369,7 @@ contract('Staking', ([owner, alice, bob, carl]) => {
             before(async () => {
                 await waitUntilBlock(10, this.startBlock + 118);
 
-                await this.boost.approve(this.staking.address, 1000, { from: alice });
+                await this.boost.approve(this.staking.address, 1000, {from: alice});
                 await this.staking.deposit(1, 1000, {from: alice});
             });
 
@@ -408,13 +393,13 @@ contract('Staking', ([owner, alice, bob, carl]) => {
             });
 
             it('reserved 75% for LP with 3200 for bob and 1750 for carl', async () => {
-                const pendingAlice = await this.staking.pending(0, alice);
+                const pendingAlice = await this.staking.pending(alice);
                 assert.equal(0, pendingAlice);
 
-                const pendingBob = await this.staking.pending(0, bob);
+                const pendingBob = await this.staking.pending(bob);
                 assert.equal(3200, pendingBob);
 
-                const pendingCarl = await this.staking.pending(0, carl);
+                const pendingCarl = await this.staking.pending(carl);
                 assert.equal(1750, pendingCarl);
             });
 
@@ -441,13 +426,13 @@ contract('Staking', ([owner, alice, bob, carl]) => {
             });
 
             it('reserved 75% for LP with 3950 for bob and 2500 for carl', async () => {
-                const pendingAlice = await this.staking.pending(0, alice);
+                const pendingAlice = await this.staking.pending(alice);
                 assert.equal(0, pendingAlice);
 
-                const pendingBob = await this.staking.pending(0, bob);
+                const pendingBob = await this.staking.pending(bob);
                 assert.equal(3950, pendingBob);
 
-                const pendingCarl = await this.staking.pending(0, carl);
+                const pendingCarl = await this.staking.pending(carl);
                 assert.equal(2500, pendingCarl);
             });
 
@@ -483,10 +468,10 @@ contract('Staking', ([owner, alice, bob, carl]) => {
             });
 
             it('reserved 75% for LP with 4325 for bob and 2875 for carl', async () => {
-                const pendingBob = await this.staking.pending(0, bob);
+                const pendingBob = await this.staking.pending(bob);
                 assert.equal(4325, pendingBob);
 
-                const pendingCarl = await this.staking.pending(0, carl);
+                const pendingCarl = await this.staking.pending(carl);
                 assert.equal(2875, pendingCarl);
             });
 
@@ -572,13 +557,13 @@ contract('Staking', ([owner, alice, bob, carl]) => {
             });
 
             it('reserved 75% for LP with 4325 for bob and 2875 for carl', async () => {
-                const pendingAlice = await this.staking.pending(0, alice);
+                const pendingAlice = await this.staking.pending(alice);
                 assert.equal(0, pendingAlice);
 
-                const pendingBob = await this.staking.pending(0, bob);
+                const pendingBob = await this.staking.pending(bob);
                 assert.equal(5450, pendingBob);
 
-                const pendingCarl = await this.staking.pending(0, carl);
+                const pendingCarl = await this.staking.pending(carl);
                 assert.equal(4000, pendingCarl);
             });
 
@@ -605,13 +590,13 @@ contract('Staking', ([owner, alice, bob, carl]) => {
             });
 
             it('has a pending reward for LP 5450 for bob and 4000 for carl', async () => {
-                const pendingAlice = await this.staking.pending(0, alice);
+                const pendingAlice = await this.staking.pending(alice);
                 assert.equal(0, pendingAlice);
 
-                const pendingBob = await this.staking.pending(0, bob);
+                const pendingBob = await this.staking.pending(bob);
                 assert.equal(5450, pendingBob);
 
-                const pendingCarl = await this.staking.pending(0, carl);
+                const pendingCarl = await this.staking.pending(carl);
                 assert.equal(4000, pendingCarl);
             });
 
@@ -683,13 +668,13 @@ contract('Staking', ([owner, alice, bob, carl]) => {
             });
 
             it('has no pending reward for LP', async () => {
-                const pendingAlice = await this.staking.pending(0, alice);
+                const pendingAlice = await this.staking.pending(alice);
                 assert.equal(0, pendingAlice);
 
-                const pendingBob = await this.staking.pending(0, bob);
+                const pendingBob = await this.staking.pending(bob);
                 assert.equal(0, pendingBob);
 
-                const pendingCarl = await this.staking.pending(0, carl);
+                const pendingCarl = await this.staking.pending(carl);
                 assert.equal(0, pendingCarl);
             });
 
