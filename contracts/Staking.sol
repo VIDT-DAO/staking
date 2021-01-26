@@ -20,7 +20,8 @@ contract Staking is Ownable {
         uint256 rewardPerToken;     // Number of ERC20 per token, times 1e36
     }
 
-    Deposits deposits;
+    // The Deposits contract that holds the staked tokens of the users.
+    Deposits public deposits;
 
     // Address of the reward ERC20 Token contract.
     IERC20 public erc20;
@@ -38,22 +39,27 @@ contract Staking is Ownable {
     uint256 public startBlock;
     // The block number when staking program ends.
     uint256 public endBlock;
-    // The number of blocks until the soft lock ends.
-    uint256 public softLockBlocks;
+    // The block number when the soft lock ends.
+    uint256 public softLockBlock;
 
     event Harvest(address indexed user, uint256 amount);
 
-    constructor(Deposits _deposits, IERC20 _erc20, uint256 _startBlock, uint256 _duration, uint256 _softLockBlocks) public {
+    constructor(Deposits _deposits, IERC20 _erc20, uint256 _startBlock, uint256 _endBlock, uint256 _softLockBlock) public {
         deposits = _deposits;
         erc20 = _erc20;
         startBlock = _startBlock;
-        endBlock = _startBlock + _duration;
-        softLockBlocks = _softLockBlocks;
+        endBlock = _endBlock;
+        softLockBlock = _softLockBlock;
     }
 
     // Number of tokens pools
     function poolLength() external view returns (uint256) {
         return poolInfo.length;
+    }
+
+    // Extend the duration of the program.
+    function extend(uint256 _blocks) public onlyOwner {
+        endBlock = endBlock.add(_blocks);
     }
 
     // End the program immediately. This can be done to replace the staking program while keeping the deposits.
@@ -71,12 +77,14 @@ contract Staking is Ownable {
         }));
     }
 
-    // View function to see number of deposited tokens and the maximum amount the user is still allowed to deposit.
-    function deposited(uint256 _pid, address _user) external view returns (uint256, uint256) {
-        return (
-            deposits.deposited(poolInfo[_pid].token, _user),
-            deposits.maxDeposit(poolInfo[_pid].token, _user)
-        );
+    // View function to see deposited tokens for a user.
+   function deposited(IERC20 _token, address _user) public view returns (uint256) {
+        return deposits.deposited(poolInfo[_pid].token, _user);
+   }
+
+    // The maximum amount of capped tokens the user is still allowed to deposit.
+    function maxDeposit(IERC20 _token, address _user) public view returns (uint256) {
+        return deposits.maxDeposit(poolInfo[_pid].token, _user);
     }
 
     // View function to see pending reward for a user.
@@ -121,7 +129,7 @@ contract Staking is Ownable {
         payoutReward(msg.sender, reward);
     }
 
-    // Transfer reward from owner to
+    // Transfer reward from the owner to the user.
     function payoutReward(address _to, uint256 _amount) internal {
         erc20.safeTransferFrom(owner(), _to, _amount);
         paidOut += _amount;
