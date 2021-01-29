@@ -53,11 +53,10 @@ npm run migrate -- --network rinkeby
 npm run verify -- --network rinkeby
 ```
 
-You may also want to verify the ERC20Mock and LPMock contracts on Etherscan.
+You may also want to verify the ERC20Mock contract on Etherscan.
 
 ```
 node_modules/.bin/truffle verify ERC20Mock
-node_modules/.bin/truffle verify LPMock
 ```
 
 _Verification may fail because of rate limits. Just try again._
