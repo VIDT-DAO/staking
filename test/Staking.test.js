@@ -68,6 +68,8 @@ contract('Staking', ([owner, alice, bob, carl]) => {
             this.staking.add(this.token2.address, 2, 500)
         ]);
 
+        await this.deposits.trust(this.staking.address);
+
         await this.erc20.approve(this.staking.address, 10000);
     });
 
@@ -123,6 +125,38 @@ contract('Staking', ([owner, alice, bob, carl]) => {
         });
     })
 
+    describe('only allows actions to be done by the contract owner', () => {
+        it('won\'t allow alice to add a token pool', async () => {
+            try {
+                await this.staking.add(this.erc20.address, 100, 1, {from: alice});
+            } catch (ex) {
+                assert.equal(ex.receipt.status, '0x0');
+                return;
+            }
+            assert.fail('transaction should not have been successful');
+        });
+
+        it('won\'t allow alice to extend the staking program', async () => {
+            try {
+                await this.staking.extend(1000, {from: alice});
+            } catch (ex) {
+                assert.equal(ex.receipt.status, '0x0');
+                return;
+            }
+            assert.fail('transaction should not have been successful');
+        });
+
+        it('won\'t allow alice to terminate the staking program', async () => {
+            try {
+                await this.staking.terminate({from: alice});
+            } catch (ex) {
+                assert.equal(ex.receipt.status, '0x0');
+                return;
+            }
+            assert.fail('transaction should not have been successful');
+        });
+    });
+
     describe('after 10 blocks of staking', () => {
         before(async () => {
             await waitUntilBlock(10, this.startBlock + 10);
@@ -137,7 +171,7 @@ contract('Staking', ([owner, alice, bob, carl]) => {
         });
     });
 
-    describe('with a 3th participant after 30 blocks', () => {
+    describe('with a 3th participant', () => {
         before(async () => {
             await waitUntilBlock(10, this.startBlock + 28);
 
@@ -174,7 +208,7 @@ contract('Staking', ([owner, alice, bob, carl]) => {
         });
     });
 
-    describe('with a participant withdrawing after 70 blocks', () => {
+    describe('with a participant withdrawing', () => {
         before(async () => {
             await waitUntilBlock(10, this.startBlock + 69);
             await this.staking.withdraw({from: alice});
@@ -182,25 +216,25 @@ contract('Staking', ([owner, alice, bob, carl]) => {
 
         it('gives alice her deposit and reward', async () => {
             const balanceERC20 = await this.erc20.balanceOf(alice);
-            assert.equal(75, balanceERC20);
+            assert.equal(105, balanceERC20);
 
             const balance1 = await this.token1.balanceOf(alice);
             assert.equal(5000, balance1);
         });
 
         it('has no deposit for alice', async () => {
-            const deposited = await this.staking.deposited(0, alice);
+            const deposited = await this.deposits.deposited(this.token1.address, alice);
             assert.equal(0, deposited);
         });
 
         it('has stored the amount that was paid out', async () => {
             const paidOut = await this.staking.paidOut();
-            assert.equal(75, paidOut);
+            assert.equal(105, paidOut);
         });
 
         it('has taken the tokens from the contract owner', async () => {
             const balanceOwner = await this.erc20.balanceOf(owner);
-            assert.equal(1000000 - 75, balanceOwner);
+            assert.equal(1000000 - 105, balanceOwner);
         });
 
         it('has a pending reward for bob and carl, but not for alice', async () => {
@@ -211,484 +245,140 @@ contract('Staking', ([owner, alice, bob, carl]) => {
             assert.equal(35, pendingBob);
 
             const pendingCarl = await this.staking.pending(carl);
-            assert.equal(140, pendingCarl);
+            assert.equal(80, pendingCarl);
         });
     });
 
-/*
-        describe('is safe', () => {
-            it('won\'t allow alice to withdraw', async () => {
-                try {
-                    await this.staking.withdraw(0, 10, {from: alice});
-                } catch (ex) {
-                    assert.equal(ex.receipt.status, '0x0');
-                    return;
-                }
-                assert.fail('withdraw successful');
-            });
+    describe('with a participant using a boost by depositing token 2', () => {
+        before(async () => {
+            await waitUntilBlock(10, this.startBlock + 98);
 
-            it('won\'t allow carl to withdraw more than his deposit', async () => {
-                const deposited = await this.staking.deposited(0, carl);
-                assert.equal(500, deposited);
+            await this.token2.approve(this.deposits.address, 500, {from: bob});
+            await this.deposits.deposit(this.token2.address, 500, {from: bob});
 
-                try {
-                    await this.staking.withdraw(0, 600, {from: carl});
-                } catch (ex) {
-                    assert.equal(ex.receipt.status, '0x0');
-                    return;
-                }
-                assert.fail('withdraw successful');
-            });
-
-            it('won\'t allow alice to add an lp token to the pool', async () => {
-                const deposited = await this.staking.deposited(0, carl);
-                assert.equal(500, deposited);
-
-                try {
-                    await this.staking.withdraw(0, 600, {from: carl});
-                } catch (ex) {
-                    assert.equal(ex.receipt.status, '0x0');
-                    return;
-                }
-                assert.fail('withdraw successful');
-            });
+            await waitUntilBlock(10, this.startBlock + 110);
         });
 
-        describe('when it receives more funds (8000 MOCK)', () => {
-            before(async () => {
-                await this.erc20.approve(this.staking.address, 8000);
-                await this.staking.fund(8000);
-            });
+        it('rewards bob for the deposited token 2', async () => {
+            const pendingBob = await this.staking.pending(bob);
+            assert.equal(75, pendingBob);
+        });
+    });
 
-            it('runs for 180 blocks (80 more)', async () => {
-                const endBlock = await this.staking.endBlock();
-                assert.equal(180, endBlock - this.startBlock);
-            });
+    describe('while running', () => {
+        it('is not possible to add a token pool', async () => {
+            try {
+                await this.staking.add(this.erc20.address, 1, 1);
+            } catch (ex) {
+                assert.equal(ex.receipt.status, '0x0');
+                return;
+            }
+            assert.fail('transaction should not have been successful');
         });
 
-        describe('with an added lp token (for 25%) after 100 blocks', () => {
-            before(async () => {
-                await waitUntilBlock(10, this.startBlock + 99);
-                this.staking.add(5, this.boost.address, true);
-            });
-
-            it('has a total reward of 3450 MOCK pending', async () => {
-                const totalPending = await this.staking.totalPending();
-                assert.equal(3450, totalPending);
-            });
-
-            it('is initialized for the LP token 2', async () => {
-                const poolLength = await this.staking.poolLength();
-                assert.equal(2, poolLength);
-
-                const poolInfo = await this.staking.poolInfo(1);
-                assert.equal(poolInfo[0], this.boost.address);
-                assert.equal(poolInfo[1].words[0], 5);
-
-                const totalAllocPoint = await this.staking.totalAllocPoint();
-                assert.equal(totalAllocPoint, 20);
-            });
-
-            it('reserved nothing for alice, 2450 for bob, and 1000 for carl', async () => {
-                const pendingAlice = await this.staking.pending(alice);
-                assert.equal(0, pendingAlice);
-
-                const pendingBob = await this.staking.pending(bob);
-                assert.equal(2450, pendingBob);
-
-                const pendingCarl = await this.staking.pending(carl);
-                assert.equal(1000, pendingCarl);
-            });
+        it('is not possible to harvest rewards', async () => {
+            try {
+                await this.staking.harvest({from: alice});
+            } catch (ex) {
+                assert.equal(ex.receipt.status, '0x0');
+                return;
+            }
+            assert.fail('transaction should not have been successful');
         });
 
-        describe('with 1st participant for Boost after 110 blocks', () => {
-            before(async () => {
-                await waitUntilBlock(10, this.startBlock + 108);
+        it('the program can be extended', async () => {
+            await this.staking.extend(500);
 
-                await this.boost.approve(this.staking.address, 500, {from: carl});
-                await this.staking.deposit(1, 500, {from: carl});
-            });
+            const endBlock = await this.staking.endBlock();
+            assert.equal(this.startBlock + 1500, endBlock);
+        });
+    });
 
-            it('holds 1000 LP for the participants', async () => {
-                const balanceStaking = await this.token1.balanceOf(this.staking.address);
-                assert.equal(1000, balanceStaking);
+    describe('when terminated', () => {
+        before(async () => {
+            await waitUntilBlock(10, this.startBlock + 199);
+            await this.staking.terminate();
+        })
 
-                const depositAlice = await this.staking.deposited(0, alice);
-                assert.equal(0, depositAlice);
-
-                const depositBob = await this.staking.deposited(0, bob);
-                assert.equal(500, depositBob);
-
-                const depositCarl = await this.staking.deposited(0, carl);
-                assert.equal(500, depositCarl);
-            });
-
-            it('holds 500 BST for the participants', async () => {
-                const balanceStaking = await this.boost.balanceOf(this.staking.address);
-                assert.equal(500, balanceStaking);
-
-                const depositAlice = await this.staking.deposited(1, alice);
-                assert.equal(0, depositAlice);
-
-                const depositBob = await this.staking.deposited(1, bob);
-                assert.equal(0, depositBob);
-
-                const depositCarl = await this.staking.deposited(1, carl);
-                assert.equal(500, depositCarl);
-            });
-
-            it('has a total reward of 4450 MOCK pending', async () => {
-                const totalPending = await this.staking.totalPending();
-                assert.equal(4450, totalPending);
-            });
-
-            it('reserved 75% for LP (50/50 bob/carl)', async () => {
-                const pendingAlice = await this.staking.pending(alice);
-                assert.equal(0, pendingAlice);
-
-                const pendingBob = await this.staking.pending(bob);
-                assert.equal(2825, pendingBob);
-
-                const pendingCarl = await this.staking.pending(carl);
-                assert.equal(1375, pendingCarl);
-            });
-
-            it('reserved 25% for BST (not rewarded) -> 250 MOCK inaccessible', async () => {
-                const pendingAlice = await this.staking.pending(1, alice);
-                assert.equal(0, pendingAlice);
-
-                const pendingBob = await this.staking.pending(1, bob);
-                assert.equal(0, pendingBob);
-
-                const pendingCarl = await this.staking.pending(1, carl);
-                assert.equal(0, pendingCarl);
-            });
+        it('the program has ended', async () => {
+            const newEndBlock = await this.staking.endBlock();
+            assert.equal(newEndBlock, this.startBlock + 200);
         });
 
-        describe('with 2nd participant for Boost after 120 blocks', () => {
-            before(async () => {
-                await waitUntilBlock(10, this.startBlock + 118);
+        it('it is not possible to extend the program', async () => {
+            try {
+                await this.staking.extend(500);
+            } catch (ex) {
+                assert.equal(ex.receipt.status, '0x0');
+                return;
+            }
+            assert.fail('transaction should not have been successful');
+        });
+    });
 
-                await this.boost.approve(this.staking.address, 1000, {from: alice});
-                await this.staking.deposit(1, 1000, {from: alice});
-            });
 
-            it('holds 1500 BST for the participants', async () => {
-                const balanceStaking = await this.boost.balanceOf(this.staking.address);
-                assert.equal(1500, balanceStaking);
-
-                const depositAlice = await this.staking.deposited(1, alice);
-                assert.equal(1000, depositAlice);
-
-                const depositBob = await this.staking.deposited(1, bob);
-                assert.equal(0, depositBob);
-
-                const depositCarl = await this.staking.deposited(1, carl);
-                assert.equal(500, depositCarl);
-            });
-
-            it('has a total reward of 5450 MOCK pending', async () => {
-                const totalPending = await this.staking.totalPending();
-                assert.equal(5450, totalPending);
-            });
-
-            it('reserved 75% for LP with 3200 for bob and 1750 for carl', async () => {
-                const pendingAlice = await this.staking.pending(alice);
-                assert.equal(0, pendingAlice);
-
-                const pendingBob = await this.staking.pending(bob);
-                assert.equal(3200, pendingBob);
-
-                const pendingCarl = await this.staking.pending(carl);
-                assert.equal(1750, pendingCarl);
-            });
-
-            it('reserved 25% for BST with 250 for carl', async () => {
-                const pendingAlice = await this.staking.pending(1, alice);
-                assert.equal(0, pendingAlice);
-
-                const pendingBob = await this.staking.pending(1, bob);
-                assert.equal(0, pendingBob);
-
-                const pendingCarl = await this.staking.pending(1, carl);
-                assert.equal(250, pendingCarl);
-            });
+    describe('with a participant harvesting the ended program', () => {
+        before(async () => {
+            await waitUntilBlock(100, this.startBlock + 499);
+            await this.staking.harvest({from: bob});
         });
 
-        describe('after 140 blocks of staking', () => {
-            before(async () => {
-                await waitUntilBlock(10, this.startBlock + 140);
-            });
-
-            it('has a total reward of 7450 MOCK pending', async () => {
-                const totalPending = await this.staking.totalPending();
-                assert.equal(7450, totalPending);
-            });
-
-            it('reserved 75% for LP with 3950 for bob and 2500 for carl', async () => {
-                const pendingAlice = await this.staking.pending(alice);
-                assert.equal(0, pendingAlice);
-
-                const pendingBob = await this.staking.pending(bob);
-                assert.equal(3950, pendingBob);
-
-                const pendingCarl = await this.staking.pending(carl);
-                assert.equal(2500, pendingCarl);
-            });
-
-            it('reserved 25% for BST with 333 for alice and 416 for carl', async () => {
-                const pendingAlice = await this.staking.pending(1, alice);
-                assert.equal(333, pendingAlice);
-
-                const pendingBob = await this.staking.pending(1, bob);
-                assert.equal(0, pendingBob);
-
-                const pendingCarl = await this.staking.pending(1, carl);
-                assert.equal(416, pendingCarl);
-            });
+        it('gives bob his reward', async () => {
+            const balanceERC20 = await this.erc20.balanceOf(bob);
+            assert.equal(300, balanceERC20);
         });
 
-        describe('with a participant partially withdrawing BST after 150 blocks', () => {
-            before(async () => {
-                await waitUntilBlock(10, this.startBlock + 149);
-                await this.staking.withdraw(1, 200, {from: carl});
-            });
+        it('did not change bob\'s deposits', async () => {
+            const deposit1 = await this.deposits.deposited(this.token1.address, bob)
+            const balance1 = await this.token1.balanceOf(bob);
+            assert.equal(500, deposit1);
+            assert.equal(0, balance1);
 
-            it('gives carl 500 MOCK and 200 LP', async () => {
-                const balanceERC20 = await this.erc20.balanceOf(carl);
-                assert.equal(3300, balanceERC20);
-
-                const balance1 = await this.boost.balanceOf(carl);
-                assert.equal(500, balance1);
-            });
-
-            it('has a total reward of 7950 MOCK pending', async () => {
-                const totalPending = await this.staking.totalPending();
-                assert.equal(7950, totalPending);
-            });
-
-            it('reserved 75% for LP with 4325 for bob and 2875 for carl', async () => {
-                const pendingBob = await this.staking.pending(bob);
-                assert.equal(4325, pendingBob);
-
-                const pendingCarl = await this.staking.pending(carl);
-                assert.equal(2875, pendingCarl);
-            });
-
-            it('reserved 25% for BST with 500 for alice and nothing for carl', async () => {
-                const pendingAlice = await this.staking.pending(1, alice);
-                assert.equal(500, pendingAlice);
-
-                const pendingCarl = await this.staking.pending(1, carl);
-                assert.equal(0, pendingCarl);
-            });
-
-            it('holds 1000 LP for the participants', async () => {
-                const balanceStaking = await this.token1.balanceOf(this.staking.address);
-                assert.equal(1000, balanceStaking);
-
-                const depositBob = await this.staking.deposited(0, bob);
-                assert.equal(500, depositBob);
-
-                const depositCarl = await this.staking.deposited(0, carl);
-                assert.equal(500, depositCarl);
-            });
-
-            it('holds 1300 BST for the participants', async () => {
-                const balanceStaking = await this.boost.balanceOf(this.staking.address);
-                assert.equal(1300, balanceStaking);
-
-                const depositAlice = await this.staking.deposited(1, alice);
-                assert.equal(1000, depositAlice);
-
-                const depositCarl = await this.staking.deposited(1, carl);
-                assert.equal(300, depositCarl);
-            });
+            const deposit2 = await this.deposits.deposited(this.token2.address, bob)
+            const balance2 = await this.token2.balanceOf(bob);
+            assert.equal(500, deposit2);
+            assert.equal(300, balance2);
         });
 
-        describe('with a participant doing an emergency withdraw BST after 160 blocks', () => {
-            before(async () => {
-                await waitUntilBlock(10, this.startBlock + 159);
-                await this.staking.emergencyWithdraw(1, {from: carl});
-            });
-
-            it('gives carl 500 LP', async () => {
-                const balance1 = await this.boost.balanceOf(carl);
-                assert.equal(800, balance1);
-            });
-
-            it('gives carl no MOCK', async () => {
-                const balanceERC20 = await this.erc20.balanceOf(carl);
-                assert.equal(3300, balanceERC20);
-            });
-
-            it('holds no BST for carl', async () => {
-                const depositCarl = await this.staking.deposited(1, carl);
-                assert.equal(0, depositCarl);
-            });
-
-            it('has no reward for carl', async () => {
-                const pendingCarl = await this.staking.pending(1, carl);
-                assert.equal(0, pendingCarl);
-            });
-
-            it('holds 1000 BST for alice', async () => {
-                const balanceStaking = await this.boost.balanceOf(this.staking.address);
-                assert.equal(1000, balanceStaking);
-
-                const depositAlice = await this.staking.deposited(1, alice);
-                assert.equal(1000, depositAlice);
-            });
-
-            it('has 750 MOCK pending for alice (receives bobs share)', async () => {
-                const pendingAlice = await this.staking.pending(1, alice);
-                assert.equal(750, pendingAlice);
-            });
+        it('has stored the amount that was paid out', async () => {
+            const paidOut = await this.staking.paidOut();
+            assert.equal(405, paidOut);
         });
 
-        describe('when closed after 180 blocks', () => {
-            before(async () => {
-                await waitUntilBlock(10, this.startBlock + 180);
-            });
-
-            it('has a total reward of 10950 MOCK pending', async () => {
-                const totalPending = await this.staking.totalPending();
-                assert.equal(10950, totalPending);
-            });
-
-            it('reserved 75% for LP with 4325 for bob and 2875 for carl', async () => {
-                const pendingAlice = await this.staking.pending(alice);
-                assert.equal(0, pendingAlice);
-
-                const pendingBob = await this.staking.pending(bob);
-                assert.equal(5450, pendingBob);
-
-                const pendingCarl = await this.staking.pending(carl);
-                assert.equal(4000, pendingCarl);
-            });
-
-            it('reserved 25% for BST with 1250 for alice', async () => {
-                const pendingAlice = await this.staking.pending(1, alice);
-                assert.equal(1250, pendingAlice);
-
-                const pendingBob = await this.staking.pending(1, bob);
-                assert.equal(0, pendingBob);
-
-                const pendingCarl = await this.staking.pending(1, carl);
-                assert.equal(0, pendingCarl);
-            });
+        it('has taken the tokens from the contract owner', async () => {
+            const balanceOwner = await this.erc20.balanceOf(owner);
+            assert.equal(1000000 - 405, balanceOwner);
         });
 
-        describe('when closed for 20 blocks (after 200 blocks)', () => {
-            before(async () => {
-                await waitUntilBlock(10, this.startBlock + 200);
-            });
+        it('has a pending reward for carl, but not for bob and alice', async () => {
+            const pendingAlice = await this.staking.pending(alice);
+            assert.equal(0, pendingAlice);
 
-            it('still has a total reward of 10950 MOCK pending', async () => {
-                const totalPending = await this.staking.totalPending();
-                assert.equal(10950, totalPending);
-            });
+            const pendingBob = await this.staking.pending(bob);
+            assert.equal(0, pendingBob);
 
-            it('has a pending reward for LP 5450 for bob and 4000 for carl', async () => {
-                const pendingAlice = await this.staking.pending(alice);
-                assert.equal(0, pendingAlice);
-
-                const pendingBob = await this.staking.pending(bob);
-                assert.equal(5450, pendingBob);
-
-                const pendingCarl = await this.staking.pending(carl);
-                assert.equal(4000, pendingCarl);
-            });
-
-            it('has a pending reward for BST with 1250 for alice', async () => {
-                const pendingAlice = await this.staking.pending(1, alice);
-                assert.equal(1250, pendingAlice);
-
-                const pendingBob = await this.staking.pending(1, bob);
-                assert.equal(0, pendingBob);
-
-                const pendingCarl = await this.staking.pending(1, carl);
-                assert.equal(0, pendingCarl);
-            });
-
-            it('will not accept new funds', async () => {
-                try {
-                    await this.staking.fund(10000);
-                } catch (ex) {
-                    assert.equal(ex.receipt.status, '0x0');
-                    return;
-                }
-                assert.fail('fund successful');
-            });
+            const pendingCarl = await this.staking.pending(carl);
+            assert.equal(340, pendingCarl);
         });
 
-        describe('with participants withdrawing after closed', async () => {
-            before(async () => {
-                await this.staking.withdraw(1, 1000, {from: alice});
-                await this.staking.withdraw(0, 500, {from: bob});
-                await this.staking.withdraw(0, 500, {from: carl});
-            });
-
-            it('gives alice 1250 MOCK and 1000 BST', async () => {
-                const balanceERC20 = await this.erc20.balanceOf(alice);
-                assert.equal(5000, balanceERC20);
-
-                const balance1 = await this.token1.balanceOf(alice);
-                assert.equal(5000, balance1);
-
-                const balanceBST = await this.boost.balanceOf(alice);
-                assert.equal(1000, balanceBST);
-            });
-
-            it('gives carl 5450 MOCK and 500 LP', async () => {
-                const balanceERC20 = await this.erc20.balanceOf(bob);
-                assert.equal(5450, balanceERC20);
-
-                const balance1 = await this.token1.balanceOf(bob);
-                assert.equal(500, balance1);
-            });
-
-            it('gives carl 4000 MOCK and 500 LP', async () => {
-                const balanceERC20 = await this.erc20.balanceOf(carl);
-                assert.equal(7300, balanceERC20);
-
-                const balance1 = await this.token1.balanceOf(carl);
-                assert.equal(2000, balance1);
-
-                const balanceBST = await this.boost.balanceOf(carl);
-                assert.equal(800, balanceBST);
-            });
-
-            it('has an end balance of 250 MOCK, which is lost forever', async () => {
-                const totalPending = await this.staking.totalPending();
-                assert.equal(250, totalPending);
-
-                const balanceStaking = await this.erc20.balanceOf(this.staking.address);
-                assert.equal(250, balanceStaking);
-            });
-
-            it('has no pending reward for LP', async () => {
-                const pendingAlice = await this.staking.pending(alice);
-                assert.equal(0, pendingAlice);
-
-                const pendingBob = await this.staking.pending(bob);
-                assert.equal(0, pendingBob);
-
-                const pendingCarl = await this.staking.pending(carl);
-                assert.equal(0, pendingCarl);
-            });
-
-            it('has no pending reward for BST', async () => {
-                const pendingAlice = await this.staking.pending(1, alice);
-                assert.equal(0, pendingAlice);
-
-                const pendingBob = await this.staking.pending(1, bob);
-                assert.equal(0, pendingBob);
-
-                const pendingCarl = await this.staking.pending(1, carl);
-                assert.equal(0, pendingCarl);
-            });
+        it('it will not allow alice to harvest', async () => {
+            try {
+                await this.staking.harvest({from: alice});
+            } catch (ex) {
+                assert.equal(ex.receipt.status, '0x0');
+                return;
+            }
+            assert.fail('transaction should not have been successful');
         });
 
-     */
+        it('it will not allow bob to harvest twice', async () => {
+            try {
+                await this.staking.harvest({from: bob});
+            } catch (ex) {
+                assert.equal(ex.receipt.status, '0x0');
+                return;
+            }
+            assert.fail('transaction should not have been successful');
+        });
+    });
 });

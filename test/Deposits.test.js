@@ -218,7 +218,7 @@ contract('Deposits', ([owner, alice, bob, carl]) => {
 
     describe('tokens are withdrawn', () => {
         before(async () => {
-            await this.deposits.withdrawWithoutReward({from: alice});
+            await this.deposits.withdraw({from: alice});
         });
 
         it('shows alice has her deposit back', async () => {
@@ -231,6 +231,48 @@ contract('Deposits', ([owner, alice, bob, carl]) => {
             const depositToken2 = await this.deposits.deposited(this.token2.address, alice);
             assert.equal(1500, balanceToken2);
             assert.equal(0, depositToken2);
+        });
+    });
+
+    describe('only allows actions to be done by the contract owner', () => {
+        it('won\'t allow alice to cap a token', async () => {
+            try {
+                await this.deposits.cap(this.token1.address, 1, this.token2.address, 1, {from: alice});
+            } catch (ex) {
+                assert.equal(ex.receipt.status, '0x0');
+                return;
+            }
+            assert.fail('transaction should not have been successful');
+        });
+
+        it('won\'t allow alice to uncap a token', async () => {
+            try {
+                await this.deposits.uncap(this.token2.address, {from: alice});
+            } catch (ex) {
+                assert.equal(ex.receipt.status, '0x0');
+                return;
+            }
+            assert.fail('transaction should not have been successful');
+        });
+
+        it('won\'t allow alice to set the limit', async () => {
+            try {
+                await this.deposits.limit(this.token1.address, 1000, {from: alice});
+            } catch (ex) {
+                assert.equal(ex.receipt.status, '0x0');
+                return;
+            }
+            assert.fail('transaction should not have been successful');
+        });
+
+        it('won\'t allow alice to withdraw for bob', async () => {
+            try {
+                await this.deposits.withdrawForUser(bob, {from: alice});
+            } catch (ex) {
+                assert.equal(ex.receipt.status, '0x0');
+                return;
+            }
+            assert.fail('transaction should not have been successful');
         });
     });
 })

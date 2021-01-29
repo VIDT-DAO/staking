@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "./Staking.sol";
 
 // Deposits holds deposits for each user.
 //
@@ -28,6 +29,9 @@ contract Deposits is Ownable {
         uint256 block;  // Block that the amount was deposited.
     }
 
+    // List of trusted addresses
+    mapping (address => bool) public trusted;
+
     mapping (IERC20 => capInfo) public caps;
 
     mapping (IERC20 => uint256) public limits;
@@ -39,6 +43,21 @@ contract Deposits is Ownable {
 
     event Deposit(address indexed user, IERC20 indexed token, uint256 amount);
     event Withdraw(address indexed user, IERC20 indexed token, uint256 amount);
+
+    modifier onlyTrusted() {
+        require(trusted[msg.sender], "this call can only be done by the staking contract");
+        _;
+    }
+
+    // Trust an address to do a call for a user
+    function trust(address _address) public onlyOwner {
+        trusted[_address] = true;
+    }
+
+    // Revoke the trust of address to do a call for a user.
+    function revokeTrust(address _address) public onlyOwner {
+        delete trusted[_address];
+    }
 
     // Set the maximum amount of tokens that can be deposited foreach reference token.
     function cap(IERC20 _referenceToken, uint256 _referenceAmount, IERC20 _cappedToken, uint256 _cappedAmount) public onlyOwner {
@@ -136,20 +155,31 @@ contract Deposits is Ownable {
 
     // Withdraw all tokens from the contract.
     // Withdrawing direct from the Deposit contract, means you won't receive any rewards.
-    function withdrawWithoutReward() public {
-        DepositInfo[] storage userDeposits = deposits[msg.sender];
+    function withdraw() public {
+        doWithdraw(msg.sender);
+    }
+
+    // Send all deposited tokens from the contract back to the user.
+    // This can only be called by trusted addresses, typically a staking contract.
+    function withdrawForUser(address _user) public onlyTrusted {
+        doWithdraw(_user);
+    }
+
+    // Internal call to withdraw tokens.
+    function doWithdraw(address _user) internal {
+        DepositInfo[] storage userDeposits = deposits[_user];
         uint256 length = userDeposits.length;
 
         for (uint256 n = 0; n < length; ++n) {
             IERC20 token = userDeposits[n].token;
             uint256 amount = userDeposits[n].amount;
 
-            token.safeTransfer(address(msg.sender), amount);
+            token.safeTransfer(_user, amount);
             totals[token] = totals[token].sub(amount);
 
-            emit Withdraw(msg.sender, token, amount);
+            emit Withdraw(_user, token, amount);
         }
 
-        delete deposits[msg.sender];
+        delete deposits[_user];
     }
 }

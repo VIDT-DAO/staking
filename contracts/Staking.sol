@@ -23,6 +23,9 @@ contract Staking is Ownable {
     // The Deposits contract that holds the staked tokens of the users.
     Deposits public deposits;
 
+    // Addresses that have harvested the contract. This can be done only once.
+    mapping (address => bool) public harvested;
+
     // Address of the reward ERC20 Token contract.
     IERC20 public erc20;
     // The total amount of ERC20 that's paid out as reward.
@@ -59,6 +62,8 @@ contract Staking is Ownable {
 
     // Extend the duration of the program.
     function extend(uint256 _blocks) public onlyOwner {
+        require(block.number < endBlock, "The staking program has already ended");
+
         endBlock = endBlock.add(_blocks);
     }
 
@@ -82,6 +87,10 @@ contract Staking is Ownable {
         uint256 reward = 0;
         uint256 length = poolInfo.length;
 
+        if (harvested[_user]) {
+            return 0;
+        }
+
         for (uint256 pid = 0; pid < length; ++pid) {
             reward = reward.add(this.pendingPool(pid, _user));
         }
@@ -101,26 +110,32 @@ contract Staking is Ownable {
         return deposits.calcReward(pool.token, _user, pool.rewardPerToken, startBlock, lastBlock).div(1e36);
     }
 
-    // Withdraw all tokens and rewards.
+    // Withdraw the rewards from the staking contract. The deposits stays untouched.
+    // This is only allowed when the program has ended.
+    function harvest() public {
+        require(block.number >= endBlock, "It's not allowed to harvest only the rewards when the program is running");
+
+        uint256 reward = pending(msg.sender);
+        require(reward > 0, "There is no pending reward for this wallet address");
+
+        harvested[msg.sender] = true;
+        erc20.safeTransferFrom(owner(), msg.sender, reward);
+        paidOut = paidOut.add(reward);
+
+        emit Harvest(msg.sender, reward);
+    }
+
+    // Withdraw both the deposits and the rewards.
     function withdraw() public {
         uint256 reward = pending(msg.sender);
 
-        payoutReward(msg.sender, reward);
-        deposits.withdrawWithoutReward();
-    }
+        if (reward > 0) {
+            erc20.safeTransferFrom(owner(), msg.sender, reward);
+            paidOut = paidOut.add(reward);
 
-    // Only withdraw the rewards.
-    function harvest() public {
-        uint256 reward = pending(msg.sender);
+            emit Harvest(msg.sender, reward);
+        }
 
-        payoutReward(msg.sender, reward);
-    }
-
-    // Transfer reward from the owner to the user.
-    function payoutReward(address _to, uint256 _amount) internal {
-        erc20.safeTransferFrom(owner(), _to, _amount);
-        paidOut += _amount;
-
-        emit Harvest(_to, _amount);
+        deposits.withdrawForUser(msg.sender);
     }
 }

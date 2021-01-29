@@ -49,4 +49,4 @@ fi
 
 truffle version
 
-node_modules/.bin/truffle test --network test test/Staking.test.js
+node_modules/.bin/truffle test --network test test/Deposits.test.js test/Staking.test.js
