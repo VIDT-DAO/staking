@@ -69,9 +69,6 @@ npm run migrate -- --network mainnet
 npm run verify -- --network mainnet
 ```
 
-The account that is used to create the Staking contract should have a sufficient amount of (LTO) ERC20 to fund the
-contract. Alternatively; to manually fund, remove the 'fund' property from the configuration.
-
 # How it works
 
 The `Deposits` contract holds the deposited tokens of the users. The contract can be configured to accept multiple
