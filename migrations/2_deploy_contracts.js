@@ -6,6 +6,8 @@ const allConfigs = require("../config.json");
 module.exports = function(deployer, network, addresses) {
   const config = allConfigs[network.replace(/-fork$/, '')] || allConfigs.default;
 
+  throw Error("Not implemented");
+
   if (!config) {
     return;
   }

@@ -118,40 +118,72 @@ takes 4 parameters; `referenceToken`, `referenceAmount`, `cappedToken`, `cappedA
 Example; if the reference amount is `10000` of token FOO, and the capped amount is `500000` of token BAR, then users
 can deposit max `5 BAR` per `1 FOO`. 
 
-## Deposit and withdraw
+## Deposit
 
-To participate in staking, users must deposit tokens using the `deposit` method on the `Staking` contract.
+To participate in staking, users must deposit tokens using the `deposit` method on the `Deposit` contract.
 
 Before using this method, the staking contract must be allowed to transfer the tokens. This is done via the `approve`
 method on the token contract.
 
-The current deposit can be checked using the `deposited` method. 
+The current deposit can be checked using the `deposited` method.
 
-Participants can withdraw their deposited tokens at any time using the `withdraw` method.
+The `maxDeposit` method provides how many tokens a user is allowed to deposit in case of a capped token. 
+
+## Withdraw
+
+Participants can withdraw their deposited tokens and rewards at any time using the `withdraw` method on the `Staking`
+contract.
+
+The `withdraw` method on the `Deposit` contract should only be used in case of an emergency. The user will get back the
+deposit but not receive any rewards.
 
 ## Reward
 
 Each participant has a pending reward which is hold by the staking contract. The pending reward can be checked using
 the `pending` method.
 
-Calling the `harvest` method will transfer the reward from the contract owner to the user. The `harvest` method differs
-from the `withdraw` method, as it will only transfer the reward and will not withdraw the staked tokens.
+When the program has ended, the user is able to harvest the reward from the `Staking` contract. Calling the `harvest`
+method will transfer the reward from the contract owner to the user. The `harvest` method differs from the `withdraw`
+method, as it will only transfer the reward and will not withdraw the staked tokens.
 
 When the deposited tokens are withdrawn, the contract will also pay out the reward.
 
 ### Soft lock
 
-A soft lock period is specified when creating the contract. If a user withdraws during this period, the reward will be 
-slashed.
+A soft lock period is specified when creating the contract. If a user withdraws during this period, a part of the reward
+will be burned instead of paid out.
 
 The penalty is a percentage of the reward. This is 100% at the starting block and 0% when the soft lock ends. The
 penalty is calculated with a linear formula.
 
-The penalty will be burned.
+### Statistics
 
-# Frontend
+The `paidOut` property of the `Staking` contract contains the total number of tokens that are paid out as a reward.
 
-The `frontend` folder contains the frontend application that allows users to participate.
+The `burned` property of the `Staking` contract contains the total number of tokens burned as a penalty during the soft
+lock period.
 
-_Note that the frontend is specifically styled and configured for VIDT. You need to modify it to use it for a
-different project._  
+## Administrative actions
+
+There are a number of administrative actions that can only be performed by the contract owner.
+
+### Extending
+
+The staking program can be extended by calling the `extend` method. This will set a new end date.
+
+It is not possible to extend the soft lock.
+
+### Termination
+
+The program can be terminated by the owner by calling the `terminate` method. No more rewards will be given through this
+contract. Users may harvest the pending reward from the contract.
+
+This will also end the soft lock period, so rewards are paid out in full.
+
+### Replacing the program
+
+Terminating the contract can be used to replace the program. Deposits stay intact, so it's possible to create a new
+program based on the existing deposits.
+
+The new contract will not hold the rewards of the terminated contract, so the frontend must combine the rewards of
+both contracts in the UI.
