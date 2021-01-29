@@ -60,7 +60,7 @@ contract('Staking', ([owner, alice, bob, carl]) => {
             this.erc20.address,
             this.startBlock,
             this.startBlock + 1000,  // End block
-            this.startBlock + 600    // Soft lock
+            this.startBlock + 100    // Soft lock
         );
 
         await Promise.all([
@@ -86,7 +86,7 @@ contract('Staking', ([owner, alice, bob, carl]) => {
 
             assert.equal(startBlock, this.startBlock);
             assert.equal(endBlock, this.startBlock + 1000);
-            assert.equal(softLockBlock, this.startBlock + 600);
+            assert.equal(softLockBlock, this.startBlock + 100);
         });
 
         it('is initialized for 2 token pools', async () => {
@@ -169,6 +169,11 @@ contract('Staking', ([owner, alice, bob, carl]) => {
             const pendingBob = await this.staking.pending(bob);
             assert.equal(5, pendingBob);
         });
+
+        it('calculates a 90% penalty', async () => {
+            const penalty = await this.staking.penalty();
+            assert.equal(0.9e36, penalty);
+        });
     });
 
     describe('with a 3th participant', () => {
@@ -214,9 +219,14 @@ contract('Staking', ([owner, alice, bob, carl]) => {
             await this.staking.withdraw({from: alice});
         });
 
+        it('has a 30% penalty', async () => {
+            const penalty = await this.staking.penalty();
+            assert.equal(0.3e36, penalty);
+        });
+
         it('gives alice her deposit and reward', async () => {
             const balanceERC20 = await this.erc20.balanceOf(alice);
-            assert.equal(105, balanceERC20);
+            assert.equal(74, balanceERC20);
 
             const balance1 = await this.token1.balanceOf(alice);
             assert.equal(5000, balance1);
@@ -227,9 +237,12 @@ contract('Staking', ([owner, alice, bob, carl]) => {
             assert.equal(0, deposited);
         });
 
-        it('has stored the amount that was paid out', async () => {
+        it('has stored the amount that was burned and paid out', async () => {
+            const burned = await this.staking.burned();
+            assert.equal(31, burned);
+
             const paidOut = await this.staking.paidOut();
-            assert.equal(105, paidOut);
+            assert.equal(74, paidOut);
         });
 
         it('has taken the tokens from the contract owner', async () => {
@@ -340,9 +353,12 @@ contract('Staking', ([owner, alice, bob, carl]) => {
             assert.equal(300, balance2);
         });
 
-        it('has stored the amount that was paid out', async () => {
+        it('has stored the amount that was burned and paid out', async () => {
+            const burned = await this.staking.burned();
+            assert.equal(31, burned);
+
             const paidOut = await this.staking.paidOut();
-            assert.equal(405, paidOut);
+            assert.equal(374, paidOut);
         });
 
         it('has taken the tokens from the contract owner', async () => {

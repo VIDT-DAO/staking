@@ -3,6 +3,7 @@ pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20Burnable.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -13,6 +14,7 @@ import "./Deposits.sol";
 contract Staking is Ownable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
+    using SafeERC20 for ERC20Burnable;
 
     // Info of each pool.
     struct PoolInfo {
@@ -27,7 +29,7 @@ contract Staking is Ownable {
     mapping (address => bool) public harvested;
 
     // Address of the reward ERC20 Token contract.
-    IERC20 public erc20;
+    ERC20Burnable public erc20;
     // The total amount of ERC20 that's paid out as reward.
     uint256 public paidOut = 0;
     // The total amount of ERC20 that's burned as a penalty.
@@ -47,7 +49,11 @@ contract Staking is Ownable {
 
     event Harvest(address indexed user, uint256 amount);
 
-    constructor(Deposits _deposits, IERC20 _erc20, uint256 _startBlock, uint256 _endBlock, uint256 _softLockBlock) public {
+    constructor(Deposits _deposits, ERC20Burnable _erc20, uint256 _startBlock, uint256 _endBlock, uint256 _softLockBlock) public {
+        require(_startBlock <- _endBlock);
+        require(_startBlock <= _softLockBlock);
+        require(_softLockBlock <= _endBlock);
+
         deposits = _deposits;
         erc20 = _erc20;
         startBlock = _startBlock;
@@ -70,6 +76,10 @@ contract Staking is Ownable {
     // End the program immediately. This can be done to replace the staking program while keeping the deposits.
     function terminate() public onlyOwner {
         endBlock = block.number;
+
+        if (softLockBlock > endBlock) {
+            softLockBlock = endBlock;
+        }
     }
 
     // Add a new token to the pool. Can only be called by the owner. Must be done before the program starts.
@@ -80,6 +90,19 @@ contract Staking is Ownable {
             token: _token,
             rewardPerToken: (_rewardAmount * 1e36) / _rewardDivider
         }));
+    }
+
+    // Return the penalty (times 10^36)
+    function penalty() public view returns (uint256) {
+        if (block.number >= softLockBlock) {
+            return 0;
+        }
+
+        if (block.number < startBlock) {
+            return 1e10;
+        }
+
+        return (softLockBlock - block.number).mul(1e36).div(softLockBlock - startBlock);
     }
 
     // View function to see pending reward for a user.
@@ -128,12 +151,19 @@ contract Staking is Ownable {
     // Withdraw both the deposits and the rewards.
     function withdraw() public {
         uint256 reward = pending(msg.sender);
+        uint256 burn = reward.mul(penalty()).div(1e36);
+        uint256 payout = reward.sub(burn);
+
+        if (burn > 0) {
+            erc20.burnFrom(owner(), burn);
+            burned = burned.add(burn);
+        }
 
         if (reward > 0) {
-            erc20.safeTransferFrom(owner(), msg.sender, reward);
-            paidOut = paidOut.add(reward);
+            erc20.safeTransferFrom(owner(), msg.sender, payout);
+            paidOut = paidOut.add(payout);
 
-            emit Harvest(msg.sender, reward);
+            emit Harvest(msg.sender, payout);
         }
 
         deposits.withdrawForUser(msg.sender);
