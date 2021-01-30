@@ -6,11 +6,13 @@ const allConfigs = require("../config.json");
 module.exports = function(deployer, network, addresses) {
   const config = allConfigs[network.replace(/-fork$/, '')] || allConfigs.default;
 
-  throw Error("Not implemented");
-
-  if (!config) {
+  if (config.skip) {
     return;
   }
+
+  console.log(network);
+
+  throw Error("Not implemented");
 
   const erc20 = config.erc20;
   

@@ -121,9 +121,18 @@ To participate in staking, users must deposit tokens using the `deposit` method 
 Before using this method, the staking contract must be allowed to transfer the tokens. This is done via the `approve`
 method on the token contract.
 
+### Deposit multiple sets of tokens
+
+It's possible to deposit different ERC20 tokens in one request using the `deposit1`, `deposit2`, or `deposit3` methods.
+
+### Deposited info
+
 The current deposit can be checked using the `deposited` method.
 
-The `maxDeposit` method provides how many tokens a user is allowed to deposit in case of a capped token. 
+The `depositedCapped` method returns the total amount a user is allowed to deposit of a capped token and the number of
+tokens the user has deposited of that capped token.
+
+The `maxDeposit` method provides how many tokens a user is allowed to deposit in case of a capped token.
 
 ## Withdraw
 

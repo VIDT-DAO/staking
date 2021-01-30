@@ -120,6 +120,18 @@ contract('Deposits', ([owner, alice, bob, carl]) => {
         });
     });
 
+    describe('can calcuate rewards', () => {
+        it('calculates rewards alice for token 1 over 1000 blocks', async () => {
+            const reward = await this.deposits.calcReward(this.token1.address, alice, 3, 1000, 2000);
+            assert.equal(1000 * 1500 * 3, reward)
+        });
+
+        it('calculates rewards alice for the first 1000 blocks', async () => {
+            const reward = await this.deposits.calcReward(this.token1.address, alice, 3, 0, 1000);
+            assert.equal((1000 - this.depositBlock1) * 1500 * 3, reward)
+        });
+    });
+
     describe('has a capped token', () => {
         before(async () => {
             await this.deposits.cap(this.token1.address, 20, this.token2.address, 10);
@@ -166,7 +178,7 @@ contract('Deposits', ([owner, alice, bob, carl]) => {
             assert.fail('deposit successful');
         });
 
-        it('won\'t allow bob to deposit less than max token 2', async () => {
+        it('will allow bob to deposit less than max token 2', async () => {
             await this.token2.approve(this.deposits.address, 100, {from: bob});
             await this.deposits.deposit(this.token2.address, 100, {from: bob});
 
@@ -175,23 +187,27 @@ contract('Deposits', ([owner, alice, bob, carl]) => {
             assert.equal(600, balanceToken2);
             assert.equal(200, depositToken2);
         });
-    });
 
-    describe('can calcuate rewards', () => {
-        it('calculates rewards alice for token 1 over 1000 blocks', async () => {
-            const reward = await this.deposits.calcReward(this.token1.address, alice, 3, 1000, 2000);
-            assert.equal(1000 * 1500 * 3, reward)
-        });
+        it('will allow alice to deposit both token 1 and token 2', async () => {
+            await this.token1.approve(this.deposits.address, 700, {from: alice});
+            await this.token2.approve(this.deposits.address, 100, {from: alice});
+            await this.deposits.deposit2(this.token2.address, 100, this.token1.address, 700, {from: alice});
 
-        it('calculates rewards alice for the first 1000 blocks', async () => {
-            const reward = await this.deposits.calcReward(this.token1.address, alice, 3, 0, 1000);
-            assert.equal((1000 - this.depositBlock1) * 1500 * 3, reward)
+            const balanceToken1 = await this.token1.balanceOf(alice);
+            const depositToken1 = await this.deposits.deposited(this.token1.address, alice);
+            assert.equal(2800, balanceToken1);
+            assert.equal(2200, depositToken1);
+
+            const balanceToken2 = await this.token2.balanceOf(alice);
+            const depositToken2 = await this.deposits.deposited(this.token2.address, alice);
+            assert.equal(400, balanceToken2);
+            assert.equal(1100, depositToken2);
         });
     });
 
     describe('has a limit of a token', () => {
         before(async () => {
-            await this.deposits.limit(this.token1.address, 3500);
+            await this.deposits.limit(this.token1.address, 4500);
             await this.token1.approve(this.deposits.address, 1000, {from: alice});
         });
 
@@ -211,8 +227,8 @@ contract('Deposits', ([owner, alice, bob, carl]) => {
 
             const balanceToken1 = await this.token1.balanceOf(alice);
             const depositToken1 = await this.deposits.deposited(this.token1.address, alice);
-            assert.equal(3000, balanceToken1);
-            assert.equal(2000, depositToken1);
+            assert.equal(2300, balanceToken1);
+            assert.equal(2700, depositToken1);
         })
     });
 

@@ -45,5 +45,7 @@
       }
     ]
   },
-  "test": false
+  "test": {
+    "skip": true
+  }
 }

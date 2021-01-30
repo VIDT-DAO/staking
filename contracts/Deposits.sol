@@ -101,22 +101,28 @@ contract Deposits is Ownable {
 
     // The maximum amount of capped tokens the user is still allowed to deposit.
     function maxDeposit(IERC20 _token, address _user) public view returns (uint256) {
-        capInfo storage info = caps[_token];
-
-        if (info.referenceAmount == 0) {
+        if (caps[_token].referenceAmount == 0) {
             return MAX_INT;
         }
 
-        uint256 depositedReference = deposited(info.referenceToken, _user);
-        uint256 depositedCapped = deposited(_token, _user);
+        (uint256 maxAmount, uint256 depositedAmount) = depositedCapped(_token, _user);
 
-        uint256 maxAmount = depositedReference.mul(info.cappedAmount).div(info.referenceAmount);
+        return depositedAmount < maxAmount ? maxAmount.sub(depositedAmount) : 0;
+    }
 
-        if (depositedCapped >= maxAmount) {
-            return 0;
+    // Get the maximum amount the user is allowed to deposit and the amount the user has deposited of a capped token.
+    function depositedCapped(IERC20 _token, address _user) public view returns (uint256, uint256) {
+        capInfo storage info = caps[_token];
+        uint256 depositedAmount = deposited(_token, _user);
+
+        if (info.referenceAmount == 0) {
+            return (MAX_INT, depositedAmount);
         }
 
-        return maxAmount.sub(depositedCapped);
+        uint256 depositedReference = deposited(info.referenceToken, _user);
+        uint256 maxAmount = depositedReference.mul(info.cappedAmount).div(info.referenceAmount);
+
+        return (maxAmount, depositedAmount);
     }
 
     // Calculate the reward a user should receive for a specific token.
@@ -137,9 +143,38 @@ contract Deposits is Ownable {
 
     // Deposit tokens to the contract.
     function deposit(IERC20 _token, uint256 _amount) public {
-        require(limits[_token] == 0 || totals[_token].add(_amount) <= limits[_token], "Limit reached");
-        require(_amount <= maxDeposit(_token, msg.sender), "Not allowed to deposit specified amount of capped token");
+        _deposit(_token, _amount);
+        _assertDeposit(_token);
+    }
 
+    // Alias of deposit
+    function deposit1(IERC20 _token, uint256 _amount) public {
+        _deposit(_token, _amount);
+        _assertDeposit(_token);
+    }
+
+    // Deposit two sets of tokens in one transaction
+    function deposit2(IERC20 _token1, uint256 _amount1, IERC20 _token2, uint256 _amount2) public {
+        _deposit(_token1, _amount1);
+        _deposit(_token2, _amount2);
+
+        _assertDeposit(_token1);
+        _assertDeposit(_token2);
+    }
+
+    // Deposit three sets of tokens in one transaction
+    function deposit3(IERC20 _token1, uint256 _amount1, IERC20 _token2, uint256 _amount2, IERC20 _token3, uint256 _amount3) public {
+        _deposit(_token1, _amount1);
+        _deposit(_token2, _amount2);
+        _deposit(_token3, _amount3);
+
+        _assertDeposit(_token1);
+        _assertDeposit(_token2);
+        _assertDeposit(_token3);
+    }
+
+    // Internal call to deposit tokens.
+    function _deposit(IERC20 _token, uint256 _amount) internal {
         _token.safeTransferFrom(address(msg.sender), address(this), _amount);
 
         deposits[msg.sender].push(DepositInfo({
@@ -153,20 +188,30 @@ contract Deposits is Ownable {
         emit Deposit(msg.sender, _token, _amount);
     }
 
+    // Assert that the amount deposited is within the limits allowed.
+    function _assertDeposit(IERC20 _token) internal view {
+        require(limits[_token] == 0 || totals[_token] <= limits[_token], "Limit reached");
+
+        if (caps[_token].referenceAmount != 0) {
+            (uint256 maxAmount, uint256 depositedAmount) = depositedCapped(_token, msg.sender);
+            require(maxAmount >= depositedAmount, "Not allowed to deposit specified amount of capped token");
+        }
+    }
+
     // Withdraw all tokens from the contract.
     // Withdrawing direct from the Deposit contract, means you won't receive any rewards.
     function withdraw() public {
-        doWithdraw(msg.sender);
+        _withdraw(msg.sender);
     }
 
     // Send all deposited tokens from the contract back to the user.
     // This can only be called by trusted addresses, typically a staking contract.
     function withdrawForUser(address _user) public onlyTrusted {
-        doWithdraw(_user);
+        _withdraw(_user);
     }
 
     // Internal call to withdraw tokens.
-    function doWithdraw(address _user) internal {
+    function _withdraw(address _user) internal {
         DepositInfo[] storage userDeposits = deposits[_user];
         uint256 length = userDeposits.length;
 
