@@ -175,6 +175,7 @@ contract Deposits is Ownable {
 
     // Internal call to deposit tokens.
     function _deposit(IERC20 _token, uint256 _amount) internal {
+        _token.approve(address(this), _amount);
         _token.safeTransferFrom(address(msg.sender), address(this), _amount);
 
         deposits[msg.sender].push(DepositInfo({
