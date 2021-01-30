@@ -111,15 +111,12 @@ the contract will pay out `10 / 1000 = 0.01` for every deposited token.
 It's possible to cap the deposit for a specific token using the `cap` method on the `Deposits` contract. This method
 takes 4 parameters; `referenceToken`, `referenceAmount`, `cappedToken`, `cappedAmount`.
 
-Example; if the reference amount is `10000` of token FOO, and the capped amount is `500000` of token BAR, then users
+Example; if the reference amount is `10000` of token FOO, and the capped amount is `50000` of token BAR, then users
 can deposit max `5 BAR` per `1 FOO`. 
 
 ## Deposit
 
 To participate in staking, users must deposit tokens using the `deposit` method on the `Deposit` contract.
-
-Before using this method, the staking contract must be allowed to transfer the tokens. This is done via the `approve`
-method on the token contract.
 
 ### Deposit multiple sets of tokens
 
